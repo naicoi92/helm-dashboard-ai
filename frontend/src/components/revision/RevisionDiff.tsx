@@ -1,16 +1,12 @@
 import { Diff2HtmlUI } from "diff2html/lib/ui/js/diff2html-ui-slim.js";
-import hljs from "highlight.js/lib/core";
-import yaml from "highlight.js/lib/languages/yaml";
-import parse from "html-react-parser";
 import { type ChangeEvent, useMemo, useState, useRef, useEffect } from "react";
 import { useParams } from "react-router";
 
 import { useGetReleaseInfoByType } from "../../API/releases";
 import useCustomSearchParams from "../../hooks/useCustomSearchParams";
 import { diffConfiguration } from "../../utils";
+import YamlEditor from "../common/YamlEditor/YamlEditor";
 import Spinner from "../Spinner";
-
-hljs.registerLanguage("yaml", yaml);
 
 type RevisionDiffProps = {
   includeUserDefineOnly?: boolean;
@@ -87,20 +83,6 @@ function RevisionDiff({
     isLoading,
     isSuccess: fetchedDataSuccessfully,
   } = useGetReleaseInfoByType({ ...params, tab }, additionalParams);
-
-  const content = useMemo(() => {
-    if (
-      data &&
-      !isLoading &&
-      (viewMode === VIEW_MODE_VIEW_ONLY || !hasRevisionToDiff)
-    ) {
-      return hljs.highlight(data, { language: "yaml" }).value;
-    }
-    if (fetchedDataSuccessfully && !data && viewMode === VIEW_MODE_VIEW_ONLY) {
-      return "No value to display";
-    }
-    return "";
-  }, [data, isLoading, viewMode, hasRevisionToDiff, fetchedDataSuccessfully]);
 
   useEffect(() => {
     if (
@@ -215,15 +197,17 @@ function RevisionDiff({
         )}
       </div>
       {isLoading ? <Spinner /> : ""}
-      {viewMode === VIEW_MODE_VIEW_ONLY && content ? (
-        <div className="relative w-full overflow-x-auto bg-white p-3">
+      {viewMode === VIEW_MODE_VIEW_ONLY && !isLoading ? (
+        data ? (
+          <div className="relative w-full bg-white p-3">
+            <YamlEditor value={data} readOnly />
+          </div>
+        ) : fetchedDataSuccessfully ? (
           <pre className="rounded-sm bg-white font-sf-mono">
-            {parse(content)}
+            No value to display
           </pre>
-        </div>
-      ) : (
-        ""
-      )}
+        ) : null
+      ) : null}
       <div
         className="relative w-full bg-white font-sf-mono leading-5"
         //@ts-expect-error ref

@@ -1,6 +1,4 @@
-import hljs from "highlight.js/lib/core";
-import yaml from "highlight.js/lib/languages/yaml";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { RiExternalLinkLine } from "react-icons/ri";
 import Drawer from "react-modern-drawer";
 import { useParams } from "react-router";
@@ -16,10 +14,9 @@ import "react-modern-drawer/dist/index.css";
 
 import Badge, { getBadgeType } from "../Badge";
 import Button from "../Button";
+import YamlEditor from "../common/YamlEditor/YamlEditor";
 import Spinner from "../Spinner";
 import { Troubleshoot } from "../Troubleshoot";
-
-hljs.registerLanguage("yaml", yaml);
 
 interface Props {
   isLatest: boolean;
@@ -158,11 +155,6 @@ const DescribeResource = ({
     resource.apiVersion
   );
 
-  const yamlFormattedData = useMemo(
-    () => hljs.highlight(data ?? "", { language: "yaml" })?.value,
-    [data]
-  );
-
   const badgeType = getBadgeType(status);
   return (
     <div className="flex h-full flex-col">
@@ -200,14 +192,8 @@ const DescribeResource = ({
       {isLoading ? (
         <Spinner />
       ) : (
-        <div className="flex-1 overflow-auto">
-          <pre
-            className="rounded-sm bg-white p-4 font-sf-mono text-base font-medium whitespace-pre"
-            style={{ overflow: "unset" }}
-            dangerouslySetInnerHTML={{
-              __html: yamlFormattedData,
-            }}
-          />
+        <div className="flex-1 overflow-auto p-4">
+          <YamlEditor value={data ?? ""} readOnly height="100%" />
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import apiService from "./apiService";
 
@@ -64,6 +64,11 @@ export const useDiffData = ({
 
       return diff;
     },
-    enabled: Boolean(selectedVerData),
+    // Gate on the after-side manifest being a real non-empty string.
+    // Previously `Boolean(selectedVerData)` was always true because the
+    // default `{}` is truthy — this caused diffs against `undefined` →
+    // "delete everything" while data was still loading.
+    enabled: Boolean(selectedVerData?.manifest),
+    placeholderData: keepPreviousData,
   });
 };

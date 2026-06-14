@@ -1,25 +1,15 @@
-import { useEffect, useState } from "react";
-
-import useDebounce from "../../../hooks/useDebounce";
+import YamlEditor from "../../common/YamlEditor/YamlEditor";
+import Spinner from "../../Spinner";
 
 export const UserDefinedValues = ({
-  initialValue,
-  onValuesChange,
+  value,
+  onChange,
+  loading,
 }: {
-  initialValue: string;
-  onValuesChange: (val: string) => void;
+  value: string;
+  onChange: (val: string) => void;
+  loading: boolean;
 }) => {
-  const [userDefinedValues, setUserDefinedValues] = useState(initialValue);
-  const debouncedValue = useDebounce<string>(userDefinedValues, 500);
-
-  useEffect(() => {
-    if (!debouncedValue || debouncedValue === initialValue) {
-      return;
-    }
-
-    onValuesChange(debouncedValue);
-  }, [debouncedValue, onValuesChange, initialValue]);
-
   return (
     <div className="w-1/2">
       <label
@@ -28,13 +18,7 @@ export const UserDefinedValues = ({
       >
         User-Defined Values:
       </label>
-      <textarea
-        value={userDefinedValues}
-        defaultValue={initialValue}
-        onChange={(e) => setUserDefinedValues(e.target.value)}
-        rows={14}
-        className="text-md font-monospace block w-full resize-none rounded-lg border border-gray-300 p-2.5 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-      ></textarea>
+      {loading ? <Spinner /> : <YamlEditor value={value} onChange={onChange} />}
     </div>
   );
 };

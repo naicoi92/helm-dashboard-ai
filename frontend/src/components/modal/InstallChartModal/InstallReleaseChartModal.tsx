@@ -1,37 +1,20 @@
-import { useMutation } from "@tanstack/react-query";
-import {
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useState,
-  lazy,
-  Suspense,
-} from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { lazy, Suspense, useState } from "react";
 import { useParams } from "react-router";
 
 import { BsPencil, BsX } from "react-icons/bs";
 
 import apiService from "../../../API/apiService";
-import type { LatestChartVersion } from "../../../API/interfaces";
-import {
-  type VersionData,
-  useChartReleaseValues,
-  useGetReleaseManifest,
-  useGetVersions,
-  useVersionData,
-} from "../../../API/releases";
-import { useChartRepoValues } from "../../../API/repositories";
-import { useDiffData } from "../../../API/shared";
+import type { VersionData } from "../../../API/releases";
 import type { InstallChartModalProps } from "../../../data/types";
-import useCustomSearchParams from "../../../hooks/useCustomSearchParams";
 import useNavigateWithSearchParams from "../../../hooks/useNavigateWithSearchParams";
 import { isNoneEmptyArray } from "../../../utils";
 import Spinner from "../../Spinner";
 import Modal, { ModalButtonStyle } from "../Modal";
 import { GeneralDetails } from "./GeneralDetails";
 import { VersionToInstall } from "./VersionToInstall";
-
 import { InstallUpgradeTitle } from "./InstallUpgradeTitle";
+import { useInstallUpgradeFlow } from "./useInstallUpgradeFlow";
 
 const DefinedValues = lazy(() => import("./DefinedValues"));
 const ManifestDiff = lazy(() => import("./ManifestDiff"));
@@ -45,135 +28,51 @@ export const InstallReleaseChartModal = ({
   latestRevision,
 }: InstallChartModalProps) => {
   const navigate = useNavigateWithSearchParams();
-  const [userValues, setUserValues] = useState<string>("");
-  const [installError, setInstallError] = useState("");
-  const [forceUpgrade, setForceUpgrade] = useState(false);
-
+  const queryClient = useQueryClient();
   const {
     namespace: queryNamespace,
-    chart: _releaseName,
-    context: selectedCluster,
+    chart: queryReleaseName,
+    context,
   } = useParams();
-  const { searchParamsObject } = useCustomSearchParams();
-  const { filteredNamespace } = searchParamsObject;
-  const [namespace, setNamespace] = useState(queryNamespace || "");
-  const [releaseName, setReleaseName] = useState(_releaseName || "");
 
-  const {
-    error: versionsError,
-    data: _versions = [],
-    isSuccess,
-    isLoading: isLoadingVersions,
-  } = useGetVersions(chartName);
-
-  const [selectedVersionData, setSelectedVersionData] = useState<VersionData>();
-
-  const [versions, setVersions] = useState<
-    Array<LatestChartVersion & { isChartVersion: boolean }>
-  >([]);
-
-  const onSuccess = useEffectEvent(() => {
-    const empty = { version: "", repository: "", urls: [] };
-    setSelectedVersionData(_versions[0] ?? empty);
-    setVersions(
-      _versions?.map((v) => ({
-        ...v,
-        isChartVersion: v.version === currentlyInstalledChartVersion,
-      }))
-    );
+  const flow = useInstallUpgradeFlow({
+    chartName,
+    currentlyInstalledChartVersion,
+    isUpgrade: true,
+    initialNamespace: queryNamespace || "",
+    initialReleaseName: queryReleaseName || "",
+    releaseNameForManifest: queryReleaseName || "",
+    latestRevision,
   });
 
-  useEffect(() => {
-    if (isSuccess && _versions.length) {
-      onSuccess();
-    }
-  }, [isSuccess, _versions]);
+  const [forceUpgrade, setForceUpgrade] = useState(false);
 
-  const selectedVersion = selectedVersionData?.version || "";
-  const selectedRepo = selectedVersionData?.repository || "";
-
-  const [chartURL, setChartURL] = useState("");
-  const [useURLMode, setUseURLMode] = useState(false);
-
-  const repoChartAddress = useMemo(() => {
-    if (!selectedVersionData || !selectedVersionData.repository) return "";
-
-    return selectedVersionData.urls?.[0]?.startsWith("file://")
-      ? selectedVersionData.urls[0]
-      : `${selectedVersionData.repository}/${chartName}`;
-  }, [selectedVersionData, chartName]);
-
-  const chartAddress = useURLMode ? chartURL : repoChartAddress || chartURL;
-
-  // the original chart values
-  const { data: chartValues = "" } = useChartRepoValues({
-    version: selectedVersion,
-    chart: chartAddress,
-  });
-
-  // The user defined values (if any we're set)
-  const { data: releaseValues = "", isLoading: loadingReleaseValues } =
-    useChartReleaseValues({
-      namespace,
-      release: String(releaseName),
-      revision: latestRevision ? latestRevision : undefined,
-    });
-
-  // This hold the selected version manifest, we use it for the diff
-  const { data: selectedVerData = {}, error: selectedVerDataError } =
-    useVersionData({
-      version: selectedVersion,
-      userValues,
-      chartAddress,
-      releaseValues,
-      namespace,
-      releaseName,
-    });
-
-  const { data: currentVerManifest, error: currentVerManifestError } =
-    useGetReleaseManifest({
-      namespace,
-      chartName: _releaseName || "",
-    });
-
-  const {
-    data: diffData,
-    isLoading: isLoadingDiff,
-    error: diffError,
-  } = useDiffData({
-    selectedRepo,
-    versionsError: versionsError as unknown as string, // TODO fix it
-    currentVerManifest: currentVerManifest ?? "",
-    selectedVerData,
-    chart: chartAddress,
-  });
-
-  // Confirm method (install)
+  // Confirm method (install/upgrade)
   const setReleaseVersionMutation = useMutation<VersionData, Error>({
     mutationKey: [
       "setVersion",
-      namespace,
-      releaseName,
-      selectedVersion,
-      selectedRepo,
-      selectedCluster,
-      chartAddress,
+      flow.namespace,
+      flow.releaseName,
+      flow.selectedVersion,
+      flow.selectedRepo,
+      context,
+      flow.chartAddress,
     ],
     mutationFn: async () => {
-      setInstallError("");
+      flow.setInstallError("");
       const formData = new FormData();
       formData.append("preview", "false");
-      if (chartAddress) {
-        formData.append("chart", chartAddress);
+      if (flow.chartAddress) {
+        formData.append("chart", flow.chartAddress);
       }
-      formData.append("version", selectedVersion || "");
-      formData.append("values", userValues || releaseValues || ""); // if userValues is empty, we use the release values
+      formData.append("version", flow.selectedVersion || "");
+      formData.append("values", flow.values || flow.releaseValues || "");
       if (forceUpgrade) {
         formData.append("force", "true");
       }
       const url = `/api/helm/releases/${
-        namespace ? namespace : "default"
-      }/${releaseName}`;
+        flow.namespace ? flow.namespace : "default"
+      }/${flow.releaseName}`;
 
       return await apiService.fetchWithSafeDefaults<VersionData>({
         url,
@@ -186,31 +85,27 @@ export const InstallReleaseChartModal = ({
     },
     onSuccess: async (response) => {
       onClose();
-      setSelectedVersionData({ version: "", urls: [] }); //cleanup
+      // Invalidate all queries instead of window.location.reload()
+      await queryClient.invalidateQueries();
       await navigate(
-        `/${
-          namespace ? namespace : "default"
-        }/${releaseName}/installed/revision/${response.version}`
+        `/${flow.namespace ? flow.namespace : "default"}/${
+          flow.releaseName
+        }/installed/revision/${response.version}`
       );
-      window.location.reload();
     },
     onError: (error) => {
-      setInstallError(error?.message || "Failed to update");
+      flow.setInstallError(error?.message || "Failed to update");
     },
   });
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={() => {
-        setSelectedVersionData({ version: "", urls: [] });
-        setUserValues(releaseValues);
-        onClose();
-      }}
+      onClose={onClose}
       title={
         <InstallUpgradeTitle
           isUpgrade={isUpgrade}
-          releaseValues={isUpgrade || !!releaseValues}
+          releaseValues={isUpgrade || !!flow.releaseValues}
           chartName={chartName}
         />
       }
@@ -234,27 +129,29 @@ export const InstallReleaseChartModal = ({
           variant: ModalButtonStyle.info,
           isLoading: setReleaseVersionMutation.isPending,
           disabled:
-            loadingReleaseValues ||
-            isLoadingDiff ||
+            flow.loadingReleaseValues ||
+            flow.isLoadingDiff ||
             setReleaseVersionMutation.isPending,
         },
       ]}
     >
-      {isLoadingVersions ? (
+      {flow.isLoadingVersions ? (
         <Spinner />
-      ) : !useURLMode && versions && isNoneEmptyArray(versions) ? (
+      ) : !flow.useURLMode &&
+        flow.versions &&
+        isNoneEmptyArray(flow.versions) ? (
         <div className="flex items-center gap-2">
           <VersionToInstall
-            versions={versions}
-            initialVersion={selectedVersionData}
-            onSelectVersion={setSelectedVersionData}
+            versions={flow.versions}
+            initialVersion={flow.selectedVersionData}
+            onSelectVersion={flow.setSelectedVersionData}
             showCurrentVersion
           />
           <button
             type="button"
             className="cursor-pointer p-1 text-gray-400 hover:text-gray-600"
             title="Switch to URL"
-            onClick={() => setUseURLMode(true)}
+            onClick={() => flow.setUseURLMode(true)}
           >
             <BsPencil className="text-lg" />
           </button>
@@ -265,19 +162,19 @@ export const InstallReleaseChartModal = ({
             <h4 className="text-lg">Chart URL:</h4>
             <input
               className="w-full rounded-sm border border-1 border-gray-300 bg-white px-2 py-1 text-lg"
-              value={chartURL}
-              onChange={(e) => setChartURL(e.target.value)}
+              value={flow.chartURL}
+              onChange={(e) => flow.setChartURL(e.target.value)}
               placeholder="oci://registry-1.docker.io/example/chart"
             />
           </div>
-          {versions && isNoneEmptyArray(versions) && (
+          {flow.versions && isNoneEmptyArray(flow.versions) && (
             <button
               type="button"
               className="cursor-pointer p-1 text-gray-400 hover:text-gray-600"
               title="Switch to repository"
               onClick={() => {
-                setUseURLMode(false);
-                setChartURL("");
+                flow.setUseURLMode(false);
+                flow.setChartURL("");
               }}
             >
               <BsX className="text-2xl" />
@@ -287,33 +184,28 @@ export const InstallReleaseChartModal = ({
       )}
 
       <GeneralDetails
-        releaseName={releaseName}
+        releaseName={flow.releaseName}
         disabled
-        namespace={namespace ? namespace : filteredNamespace}
-        onReleaseNameInput={setReleaseName}
-        onNamespaceInput={setNamespace}
+        namespace={flow.namespace ? flow.namespace : flow.filteredNamespace}
+        onReleaseNameInput={flow.setReleaseName}
+        onNamespaceInput={flow.setNamespace}
       />
 
       <Suspense fallback={<Spinner />}>
         <DefinedValues
-          initialValue={releaseValues}
-          onUserValuesChange={(values: string) => setUserValues(values)}
-          chartValues={chartValues}
-          loading={loadingReleaseValues}
+          value={flow.values}
+          onUserValuesChange={flow.setValues}
+          chartValues={flow.chartValues}
+          loading={flow.loadingReleaseValues}
         />
       </Suspense>
 
       <Suspense fallback={<Spinner />}>
         <ManifestDiff
-          diff={diffData as string}
-          isLoading={isLoadingDiff}
-          error={
-            (currentVerManifestError as unknown as string) || // TODO fix it
-            (selectedVerDataError as unknown as string) ||
-            (diffError as unknown as string) ||
-            installError ||
-            (versionsError as unknown as string)
-          }
+          diff={flow.diffData as string}
+          isLoading={flow.isLoadingDiff}
+          isFetching={flow.isFetchingDiff}
+          error={flow.errorString}
         />
       </Suspense>
     </Modal>

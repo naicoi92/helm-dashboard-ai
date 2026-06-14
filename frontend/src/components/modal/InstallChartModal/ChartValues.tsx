@@ -1,9 +1,5 @@
-import hljs from "highlight.js/lib/core";
-import yaml from "highlight.js/lib/languages/yaml";
-
+import YamlEditor from "../../common/YamlEditor/YamlEditor";
 import Spinner from "../../Spinner";
-
-hljs.registerLanguage("yaml", yaml);
 
 export const ChartValues = ({
   chartValues,
@@ -20,24 +16,15 @@ export const ChartValues = ({
       >
         Chart Value Reference:
       </label>
-      <pre
-        className="block max-h-[330px] w-full overflow-y-auto rounded-sm bg-chart-values p-2 font-sf-mono text-base font-medium"
-        dangerouslySetInnerHTML={
-          chartValues && !loading
-            ? {
-                __html: hljs.highlight(chartValues, {
-                  language: "yaml",
-                }).value,
-              }
-            : undefined
-        }
-      >
-        {loading ? (
-          <Spinner />
-        ) : !chartValues && !loading ? (
-          "No original values information found"
-        ) : null}
-      </pre>
+      {loading ? (
+        <Spinner />
+      ) : !chartValues ? (
+        <p className="font-sf-mono text-base font-medium text-gray-500">
+          No original values information found
+        </p>
+      ) : (
+        <YamlEditor value={chartValues} readOnly />
+      )}
     </div>
   );
 };

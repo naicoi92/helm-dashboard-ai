@@ -11,16 +11,23 @@ hljs.registerLanguage("yaml", yaml);
 interface ManifestDiffProps {
   diff?: string;
   isLoading: boolean;
+  isFetching: boolean;
   error: string;
 }
 
-const ManifestDiff = ({ diff, isLoading, error }: ManifestDiffProps) => {
+const ManifestDiff = ({
+  diff,
+  isLoading,
+  isFetching,
+  error,
+}: ManifestDiffProps) => {
   const diffContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    // Skip drawing during the initial load (no data yet).
+    // During background refetches the previous diff stays visible
+    // thanks to keepPreviousData, so we only redraw when new data arrives.
     if (isLoading) {
-      // we're listening to isLoading to draw new diffs which are not
-      // always rerender, probably because of the use of ref
       return;
     }
 
@@ -36,6 +43,8 @@ const ManifestDiff = ({ diff, isLoading, error }: ManifestDiffProps) => {
     }
   }, [diff, isLoading]);
 
+  // Full spinner only on the very first load (no diff rendered yet).
+  // Subsequent refetches keep the previous diff visible with an "updating" badge.
   if (isLoading && !error) {
     return (
       <div className="flex items-end text-lg">
@@ -47,17 +56,25 @@ const ManifestDiff = ({ diff, isLoading, error }: ManifestDiffProps) => {
 
   return (
     <div>
-      <h4 className="text-xl">Manifest changes:</h4>
+      <h4 className="flex items-center gap-2 text-xl">
+        Manifest changes:
+        {isFetching && !error && (
+          <span className="flex items-center gap-1 text-sm font-normal text-gray-500">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-500" />
+            updating...
+          </span>
+        )}
+      </h4>
 
       {error ? (
         <p className="text-lg text-red-600">
-          Failed to get upgrade info: {error.toString()}
+          Failed to get upgrade info: {error}
         </p>
       ) : diff ? (
         <div
           ref={diffContainerRef}
           className="relative overflow-y-auto leading-5"
-        ></div>
+        />
       ) : (
         <pre className="font-roboto text-base">
           No changes will happen to the cluster

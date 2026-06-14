@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   useMutation,
   type UseMutationOptions,
   useQuery,
@@ -338,7 +339,6 @@ export const useVersionData = ({
   version,
   userValues,
   chartAddress,
-  releaseValues,
   namespace,
   releaseName,
   isInstallRepoChart = false,
@@ -347,7 +347,6 @@ export const useVersionData = ({
   version: string;
   userValues: string;
   chartAddress: string;
-  releaseValues: string;
   namespace: string;
   releaseName: string;
   isInstallRepoChart?: boolean;
@@ -358,7 +357,6 @@ export const useVersionData = ({
       version,
       userValues,
       chartAddress,
-      releaseValues,
       namespace,
       releaseName,
       isInstallRepoChart,
@@ -368,7 +366,6 @@ export const useVersionData = ({
         version,
         userValues,
         chart: chartAddress,
-        releaseValues,
         releaseName,
       });
 
@@ -391,6 +388,7 @@ export const useVersionData = ({
     },
 
     enabled,
+    placeholderData: keepPreviousData,
   });
 };
 

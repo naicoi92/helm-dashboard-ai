@@ -43,6 +43,13 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             react: ["react", "react-dom", "react-router", "flowbite-react"],
+            codemirror: [
+              "@uiw/react-codemirror",
+              "@codemirror/lang-yaml",
+              "@uiw/codemirror-theme-github",
+              "@uiw/codemirror-theme-tokyo-night",
+            ],
+            prettier: ["prettier"],
           },
         },
       },
